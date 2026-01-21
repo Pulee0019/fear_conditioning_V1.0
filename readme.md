@@ -1,13 +1,16 @@
-# Driver Installation
-## 1. NI card driver
-### **NI-DAQmx**: [NI-DAQmx official website](https://www.ni.com/zh-cn/support/downloads/drivers/download.ni-daq-mx.html#569353)
+# 1 Driver Installation
+## 1.1 NI card driver
+### 1.1.1 **NI-DAQmx**: [NI-DAQmx official website](https://www.ni.com/zh-cn/support/downloads/drivers/download.ni-daq-mx.html#569353)
 ![NI-DAQmx](https://github.com/Pulee0019/fear_conditioning_V1.0/blob/main/imgs/NI-DAQmx.png)
-## 2. FLIR camera driver
-### **PySpin 4.3 for Windows (Windows 64-bit -- Python 3.10)**:  [FlIR camera driver official website](https://www.teledynevisionsolutions.com/support/support-center/software-firmware-downloads/iis/spinnaker-sdk-download/spinnaker-sdk--download-files/?pn=Spinnaker+SDK&vn=Spinnaker+SDK)
-### **Spinnaker SDK 4.3 for Windows (Full Version) (Windows 64-bit -- Full)**:  [FLIR camera driver offical website](https://www.teledynevisionsolutions.com/support/support-center/software-firmware-downloads/iis/spinnaker-sdk-download/spinnaker-sdk--download-files/?pn=Spinnaker+SDK&vn=Spinnaker+SDK)
+## 1.2 FLIR camera driver
+### 1.2.1 **PySpin 4.3 for Windows (Windows 64-bit -- Python 3.10)**:  [FlIR camera driver official website](https://www.teledynevisionsolutions.com/support/support-center/software-firmware-downloads/iis/spinnaker-sdk-download/spinnaker-sdk--download-files/?pn=Spinnaker+SDK&vn=Spinnaker+SDK)
+![FLIR1](https://github.com/Pulee0019/fear_conditioning_V1.0/blob/main/imgs/FLIR1.png)
+### 1.2.2 **Spinnaker SDK 4.3 for Windows (Full Version) (Windows 64-bit -- Full)**:  [FLIR camera driver offical website](https://www.teledynevisionsolutions.com/support/support-center/software-firmware-downloads/iis/spinnaker-sdk-download/spinnaker-sdk--download-files/?pn=Spinnaker+SDK&vn=Spinnaker+SDK)
+![FLIR2](https://github.com/Pulee0019/fear_conditioning_V1.0/blob/main/imgs/FLIR2.png)
 > **The download speed maybe slow.**
 ## 3.HIKI robot camera driver
 ### MVS: [HIKIrobot camera driver official website](https://www.hikrobotics.com/cn/machinevision/service/download/?module=0)
+![HIKI robot](https://github.com/Pulee0019/fear_conditioning_V1.0/blob/main/imgs/HIKI%20robot.png)
 > After installation, find and edit **MvCameraControl_class. py**, change the dllname = r"your download path\fear training\lib\MvCameraControl.dll" to your **MvCameraControl.dll** path, save it.
 # Configure environment in Anaconda Prompt
 ## Create and activate environment
