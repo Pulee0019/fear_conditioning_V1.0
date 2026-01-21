@@ -1,0 +1,38 @@
+# Driver Installation
+## 1. NI card driver
+### **NI-DAQmx**: [NI-DAQmx official website](https://www.ni.com/zh-cn/support/downloads/drivers/download.ni-daq-mx.html#569353)
+![NI-DAQmx](https://github.com/Pulee0019/fear_conditioning_V1.0/blob/main/imgs/NI-DAQmx.png)
+## 2. FLIR camera driver
+### **PySpin 4.3 for Windows (Windows 64-bit -- Python 3.10)**:  [FlIR camera driver official website](https://www.teledynevisionsolutions.com/support/support-center/software-firmware-downloads/iis/spinnaker-sdk-download/spinnaker-sdk--download-files/?pn=Spinnaker+SDK&vn=Spinnaker+SDK)
+### **Spinnaker SDK 4.3 for Windows (Full Version) (Windows 64-bit -- Full)**:  [FLIR camera driver offical website](https://www.teledynevisionsolutions.com/support/support-center/software-firmware-downloads/iis/spinnaker-sdk-download/spinnaker-sdk--download-files/?pn=Spinnaker+SDK&vn=Spinnaker+SDK)
+> **The download speed maybe slow.**
+## 3.HIKI robot camera driver
+### MVS: [HIKIrobot camera driver official website](https://www.hikrobotics.com/cn/machinevision/service/download/?module=0)
+> After installation, find and edit **MvCameraControl_class. py**, change the dllname = r"your download path\fear training\lib\MvCameraControl.dll" to your **MvCameraControl.dll** path, save it.
+# Configure environment in Anaconda Prompt
+## Create and activate environment
+```
+conda create -n fear_training python=3.10 -y    
+conda activate fear_training
+```
+## Installation
+```
+python -m ensurepip
+python -m pip install --upgrade pip numpy matplotlib
+pip install pyserial
+pip install sounddevice
+pip install opencv-python
+pip intsall opencv-contrib-python
+pip install PyDAQmx
+pip install pywin32
+pip install pandas
+pip install spicy
+```
+## Install the spinnaker to environment
+> Change the working path to your file path directory of **spinnaker_python-4.2.0.83-cp310-cp310-win_amd64.whl** (in .zip of FLIR camera driver for python 3.10 windows)
+### Change the path, if your spinnaker path in C driver
+`cd your spinnaker path`
+### Change the path, if your spinnaker path in other driver
+`cd /d your spinnaker path`
+### Install spinnaker
+`python -m pip install spinnaker_python-4.2.0.83-cp310-cp310-win_amd64.whl`
