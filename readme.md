@@ -12,6 +12,9 @@
 ### MVS: [HIKIrobot camera driver official website](https://www.hikrobotics.com/cn/machinevision/service/download/?module=0)
 ![HIKI robot](https://github.com/Pulee0019/fear_conditioning_V1.0/blob/main/imgs/HIKI%20robot.png)
 > After installation, find and edit **MvCameraControl_class. py**, change the dllname = r"your download path\fear training\lib\MvCameraControl.dll" to your **MvCameraControl.dll** path, save it.
+![MvCameraControl](https://github.com/Pulee0019/fear_conditioning_V1.0/blob/main/imgs/MvCameraControl.png)
+![code](https://github.com/Pulee0019/fear_conditioning_V1.0/blob/main/imgs/code.png)
+![MvCameraControlGUI](https://github.com/Pulee0019/fear_conditioning_V1.0/blob/main/imgs/MvCameraControlGUI.png)
 # Configure environment in Anaconda Prompt
 ## Create and activate environment
 ```
