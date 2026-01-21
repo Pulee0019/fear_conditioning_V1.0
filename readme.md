@@ -36,6 +36,7 @@ pip install spicy
 ```
 ## Install the spinnaker to environment
 > Change the working path to your file path directory of **spinnaker_python-4.2.0.83-cp310-cp310-win_amd64.whl** (in .zip of FLIR camera driver for python 3.10 windows)
+![spinnaker](https://github.com/Pulee0019/fear_conditioning_V1.0/blob/main/imgs/spinnaker.png)
 ### Change the path, if your spinnaker path in C driver
 `cd your spinnaker path`
 ### Change the path, if your spinnaker path in other driver
