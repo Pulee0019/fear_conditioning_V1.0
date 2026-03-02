@@ -1674,14 +1674,14 @@ class BaseAnalyzerApp:
                         
                         median_full = np.median(raw_target)
                         
-                        if ref_wavelength == "410" and self.apply_baseline.get():
+                        if ref_wavelength != "baseline" and self.apply_baseline.get():
                             if f"CH{channel_num}_{wavelength}_motion_corrected" in animal_data['preprocessed_data'].columns:
                                 motion_corrected = animal_data['preprocessed_data'][f"CH{channel_num}_{wavelength}_motion_corrected"]
                                 dff_data = motion_corrected / median_full
                                 print(f"ref_wavelength: {ref_wavelength}, apply_baseline: {self.apply_baseline.get()}")
                             else:
                                 continue
-                        elif ref_wavelength == "410" and not self.apply_baseline.get():
+                        elif ref_wavelength != "baseline" and not self.apply_baseline.get():
                             if f"CH{channel_num}_{wavelength}_fitted_ref" in animal_data['preprocessed_data'].columns:
                                 fitted_ref = animal_data['preprocessed_data'][f"CH{channel_num}_{wavelength}_fitted_ref"]
                                 dff_data = (raw_target - fitted_ref) / fitted_ref
@@ -1910,68 +1910,62 @@ class BaseAnalyzerApp:
         except Exception as e:
             messagebox.showerror("Error", f"Z-score calculation failed: {str(e)}")
             self.set_status("Z-score calculation failed")
+    
+    def calculate_eposides(self, animal_data, channel_num, cols, wavelength, event_start, event_end, pre_window, post_window, post_flag):
+        event_window_start = event_start - pre_window
+        if post_flag is True:
+            event_window_end = event_end + post_window
+        else:
+            event_window_end = event_start + post_window
+        
+        time_data = np.asanyarray(animal_data['preprocessed_data'][animal_data['channels']['time']] - animal_data['video_start_fiber'])
+        
+        if f"CH{channel_num}_{wavelength}_smoothed" in animal_data['preprocessed_data'].columns:
+            raw_target = animal_data['preprocessed_data'][f"CH{channel_num}_{wavelength}_smoothed"]
+        else:
+            raw_target = animal_data['preprocessed_data'][cols]
+        
+        motion_corrected_col = f"CH{channel_num}_{wavelength}_motion_corrected"
+        fitted_ref_col = f"CH{channel_num}_{wavelength}_fitted_ref"
+        baseline_fitted_col = f"CH{channel_num}_{wavelength}_baseline_pred"
+        
+        baseline_start = event_start - pre_window
+        baseline_end = event_start
+        
+        raw_baseline = raw_target[(time_data >= baseline_start) & (time_data <= baseline_end)]
+        F0 = np.median(raw_baseline)
+        if F0 == 0 or np.isnan(F0):
+            F0 = np.finfo(float).eps
+        
+        if self.reference_signal_var != "baseline" and self.apply_baseline.get():
+            if motion_corrected_col in animal_data['preprocessed_data'].columns:
+                signal_data = animal_data['preprocessed_data'][motion_corrected_col]
+                dff_signal = signal_data / F0
+            else:
+                dff_signal = (raw_target - F0) / F0
+        elif self.reference_signal_var != "baseline" and not self.apply_baseline.get():
+            if fitted_ref_col in animal_data['preprocessed_data'].columns:
+                fitted_ref = animal_data['preprocessed_data'][fitted_ref_col]
+                dff_signal = (raw_target - fitted_ref) / fitted_ref
+            else:
+                dff_signal = (raw_target - F0) / F0
+        elif self.reference_signal_var == "baseline" and self.apply_baseline.get():
+            if baseline_fitted_col in animal_data['preprocessed_data'].columns:
+                baseline_fitted = animal_data['preprocessed_data'][baseline_fitted_col]
+                dff_signal = (raw_target - baseline_fitted) / F0
+            else:
+                dff_signal = (raw_target - F0) / F0
+        else:
+            dff_signal = (raw_target - F0) / F0
             
-    def compute_event_zscore_from_dff(self, dff_data, time_data, event_start, event_end, pre_window, post_window, post_flag):
-        """Compute event-related z-score from dF/F data"""
-        event_window_start = event_start - pre_window
-        if post_flag is True:
-            event_window_end = event_end + post_window
-        else:
-            event_window_end = event_start + post_window
+        eposide_dffs = dff_signal[(time_data >= event_window_start) & (time_data <= event_window_end)]
+        eposide_time = time_data[(time_data >= event_window_start) & (time_data <= event_window_end)] - event_start
         
-        time_data = np.asarray(time_data, dtype=float)
-        dff_data = np.asarray(dff_data, dtype=float)
-
-        window_mask = (time_data >= event_window_start) & (time_data <= event_window_end)
-        window_time = time_data[window_mask]
-        window_dff = dff_data[window_mask]
+        baseline_dffs = dff_signal[(time_data >= baseline_start) & (time_data <= baseline_end)]
         
-        valid_mask = ~np.isnan(window_dff) & ~np.isnan(window_time)
-        window_time = window_time[valid_mask]
-        window_dff = window_dff[valid_mask]
-
-        if len(window_dff) == 0:
-            return np.array([]), np.array([]), None
+        eposide_zscores = (eposide_dffs - np.mean(baseline_dffs)) / np.std(baseline_dffs) if np.std(baseline_dffs) > 0 else np.zeros_like(eposide_dffs)
         
-        baseline_mask = (window_time >= event_window_start) & (window_time < event_start)
-        baseline_dff = window_dff[baseline_mask]
-        
-        if len(baseline_dff) < 2:
-            return window_time - event_start, np.full(len(window_dff), np.nan), None
-        
-        baseline_mean = np.mean(baseline_dff)
-        baseline_std = np.std(baseline_dff)
-        
-        if baseline_std == 0:
-            baseline_std = 1e-6
-        
-        zscores = (window_dff - baseline_mean) / baseline_std
-        
-        return window_time - event_start, zscores, (baseline_mean, baseline_std)
-
-    def compute_event_dff_from_dff(self, dff_data, time_data, event_start, event_end, pre_window, post_window, post_flag):
-        """Compute event-related dF/F from dF/F data"""
-        event_window_start = event_start - pre_window
-        if post_flag is True:
-            event_window_end = event_end + post_window
-        else:
-            event_window_end = event_start + post_window
-        
-        time_data = np.asarray(time_data, dtype=float)
-        dff_data = np.asarray(dff_data, dtype=float)
-
-        window_mask = (time_data >= event_window_start) & (time_data <= event_window_end)
-        window_time = time_data[window_mask]
-        window_dff = dff_data[window_mask]
-        
-        valid_mask = ~np.isnan(window_dff) & ~np.isnan(window_time)
-        window_time = window_time[valid_mask]
-        window_dff = window_dff[valid_mask]
-
-        if len(window_dff) == 0:
-            return np.array([]), np.array([])
-        
-        return window_time - event_start, window_dff
+        return eposide_time, eposide_dffs, eposide_zscores
     
     def show_event_activity_dialog(self):
         """Show dialog for event activity and heatmap parameters with group-based buttons"""
@@ -2590,9 +2584,6 @@ class BaseAnalyzerApp:
                         
                         event = events.iloc[event_idx]
                         
-                        time_col = animal_data['channels']['time']
-                        time_data = animal_data['preprocessed_data'][time_col] - animal_data['video_start_fiber']
-                        
                         if animal_data.get('event_time_absolute', False):
                             start_time = event['start_absolute'] - animal_data['video_start_fiber']
                             end_time = event['end_absolute'] - animal_data['video_start_fiber']
@@ -2609,15 +2600,7 @@ class BaseAnalyzerApp:
                             if not cols:
                                 continue
                             
-                            dff_key = f"{channel_num}_{wavelength}"
-                            dff_data = animal_data['dff_data'].get(dff_key)
-                            if dff_data is None:
-                                continue
-                            
-                            event_time_rel, event_zscore, _ = self.compute_event_zscore_from_dff(
-                                dff_data, time_data, start_time, end_time,
-                                group_params['pre_window'], group_params['post_window'], post_flag=True
-                            )
+                            event_time_rel, _, event_zscore = self.calculate_eposides(animal_data, channel_num, cols, wavelength, start_time, end_time, group_params['pre_window'], group_params['post_window'], post_flag=True)
                             
                             if len(event_time_rel) > 0:
                                 if group_params['smooth_method'] == "Moving Average":
@@ -2755,9 +2738,6 @@ class BaseAnalyzerApp:
                         
                         event = events.iloc[event_idx]
                         
-                        time_col = animal_data['channels']['time']
-                        time_data = animal_data['preprocessed_data'][time_col] - animal_data['video_start_fiber']
-                        
                         if animal_data.get('event_time_absolute', False):
                             start_time = event['start_absolute'] - animal_data['video_start_fiber']
                             end_time = event['end_absolute'] - animal_data['video_start_fiber']
@@ -2774,15 +2754,7 @@ class BaseAnalyzerApp:
                             if not cols:
                                 continue
                             
-                            dff_key = f"{channel_num}_{wavelength}"
-                            dff_data = animal_data['dff_data'].get(dff_key)
-                            if dff_data is None:
-                                continue
-                            
-                            event_time_rel, event_zscore, _ = self.compute_event_zscore_from_dff(
-                                dff_data, time_data, start_time, end_time,
-                                group_params['pre_window'], group_params['post_window'], post_flag=True
-                            )
+                            event_time_rel, _, event_zscore = self.calculate_eposides(animal_data, channel_num, cols, wavelength, start_time, end_time, group_params['pre_window'], group_params['post_window'], post_flag=True)
                             
                             if len(event_time_rel) > 0:
                                 # Apply smoothing if requested
@@ -2985,9 +2957,6 @@ class BaseAnalyzerApp:
                         
                         event = events.iloc[event_idx]
                         
-                        time_col = animal_data['channels']['time']
-                        time_data = animal_data['preprocessed_data'][time_col] - animal_data['video_start_fiber']
-                        
                         if animal_data.get('event_time_absolute', False):
                             start_time = event['start_absolute'] - animal_data['video_start_fiber']
                             end_time = event['end_absolute'] - animal_data['video_start_fiber']
@@ -3004,22 +2973,8 @@ class BaseAnalyzerApp:
                             if not cols:
                                 continue
                             
-                            dff_key = f"{channel_num}_{wavelength}"
-                            dff_data = animal_data['dff_data'].get(dff_key)
-                            if dff_data is None:
-                                continue
-                            
-                            # Compute event dF/F
-                            event_time_rel, event_dff = self.compute_event_dff_from_dff(
-                                dff_data, time_data, start_time, end_time,
-                                group_params['pre_window'], group_params['post_window'], post_flag=True
-                            )
-
-                            # Compute event Z-score
-                            event_time_rel, event_zscore, _ = self.compute_event_zscore_from_dff(
-                                dff_data, time_data, start_time, end_time,
-                                group_params['pre_window'], group_params['post_window'], post_flag=True
-                            )
+                            # Compute event dF/F and Z-score
+                            event_time_rel, event_dff, event_zscore = self.calculate_eposides(animal_data, channel_num, cols, wavelength, start_time, end_time, group_params['pre_window'], group_params['post_window'], post_flag=True)
 
                             if len(event_time_rel) > 0:
                                 # Apply smoothing
