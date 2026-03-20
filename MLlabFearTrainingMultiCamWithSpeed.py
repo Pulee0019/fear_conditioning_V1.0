@@ -49,6 +49,7 @@ Repair the issue of multichannel speed encode
 """ 
 
 import os
+import sys
 import cv2
 import csv
 import time
@@ -69,13 +70,15 @@ from PyDAQmx import *
 from queue import Queue
 from PyDAQmx import Task
 from datetime import datetime
-from CameraParams_header import *  # Custom module for camera parameters
-from MvErrorDefine_const import *  # Custom module for camera error definitions
-from MvCameraControl_class import *  # Custom module for camera control
 from PIL import Image, ImageTk, ImageOps
 from tkinter import ttk, filedialog, messagebox
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from PyDAQmx.DAQmxTypes import DAQmxEveryNSamplesEventCallbackPtr
+
+sys.path.append(os.getenv('MVCAM_COMMON_RUNENV') + "/Samples/Python/MvImport")
+from CameraParams_header import *
+from MvErrorDefine_const import *
+from MvCameraControl_class import *
 
 # Set matplotlib backend for Tkinter
 matplotlib.use('TkAgg')
@@ -561,12 +564,18 @@ class HKCamera:
             for i in range(device_list.nDeviceNum):
                 dev_info = device_list.pDeviceInfo[i].contents
                 if dev_info.nTLayerType == MV_USB_DEVICE:
-                    model_name = ""
-                    if dev_info.SpecialInfo.stUsb3VInfo.chModelName:
-                        model_name = bytes(dev_info.SpecialInfo.stUsb3VInfo.chModelName).decode('utf-8').rstrip('\x00')
+                    # model_name = ""
+                    serial_number = ""
+                    # if dev_info.SpecialInfo.stUsb3VInfo.chModelName:
+                    #     model_name = bytes(dev_info.SpecialInfo.stUsb3VInfo.chModelName).decode('utf-8').rstrip('\x00')
+                    # else:
+                    #     model_name = f"HIK Camera {i+1}"
+                    if dev_info.SpecialInfo.stUsb3VInfo.chSerialNumber:
+                        serial_number = bytes(dev_info.SpecialInfo.stUsb3VInfo.chSerialNumber).decode('utf-8').rstrip('\x00')
                     else:
-                        model_name = f"HIK Camera {i+1}"
-                    devices.append(model_name)
+                        serial_number = f"SN_{i+1}"
+
+                    devices.append(serial_number)
             return devices
         except Exception as e:
             print(f"Error listing HIK devices: {e}")
@@ -2076,7 +2085,7 @@ class ExperimentGUI:
             # Start camera recording
             camera_timestamps = []
             for camera in self.cameras:
-                filename = f"{prefix}_cam{camera.camera_id}_{timestamp}.avi"
+                filename = f"{prefix}_{timestamp}_cam{camera.camera_id}.avi"
                 save_path = os.path.join(self.save_dir, filename)
                 try:
                     start_time = camera.start_record(save_path)
@@ -2856,7 +2865,7 @@ class ExperimentGUI:
         if self.cameras:
             camera_timestamps = []
             for camera in self.cameras:
-                filename = f"{prefix}_cam{camera.camera_id}_{timestamp}.avi"
+                filename = f"{prefix}_{timestamp}_cam{camera.camera_id}.avi"
                 save_path = os.path.join(self.save_dir, filename)
                 try:
                     start_time = camera.start_record(save_path)
@@ -3011,7 +3020,7 @@ class ExperimentGUI:
         
     def save_logs(self, prefix, timestamp):
         if self.event_log:
-            event_file = os.path.join(self.save_dir, f"{prefix}_events_{timestamp}.csv")
+            event_file = os.path.join(self.save_dir, f"{prefix}_{timestamp}_events.csv")
             try:
                 with open(event_file, 'w', newline='') as f:
                     writer = csv.writer(f)
@@ -3025,7 +3034,7 @@ class ExperimentGUI:
             print("No event log to save.")
 
         if self.timestamp_log:
-            timestamp_file = os.path.join(self.save_dir, f"{prefix}_timestamps_{timestamp}.csv")
+            timestamp_file = os.path.join(self.save_dir, f"{prefix}_{timestamp}_timestamps.csv")
             try:
                 with open(timestamp_file, 'w', newline='') as f:
                     writer = csv.writer(f)
@@ -3039,7 +3048,7 @@ class ExperimentGUI:
             print("No timestamp log to save.")
 
         if self.opto_genetic_log:
-            optogenetics_file = os.path.join(self.save_dir, f"{prefix}_optogenetics_{timestamp}.csv")
+            optogenetics_file = os.path.join(self.save_dir, f"{prefix}_{timestamp}_optogenetics.csv")
             try:
                 with open(optogenetics_file, 'w', newline='') as f:
                     writer = csv.writer(f)
