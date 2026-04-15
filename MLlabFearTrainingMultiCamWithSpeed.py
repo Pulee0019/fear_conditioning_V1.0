@@ -52,6 +52,7 @@ import os
 import sys
 import cv2
 import csv
+import json
 import time
 import queue
 import serial
@@ -1738,6 +1739,189 @@ class ExperimentGUI:
         self.setup_ui()
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+    def save_configuration(self):
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json")],
+            initialdir=self.save_dir
+        )
+        if not filename:
+            return
+        
+        config = {}
+
+        config["user_filename_prefix"] = self.user_filename_prefix.get()
+        config["save_dir"] = self.save_dir
+        config["enable_speed_sensor"] = self.enable_speed_sensor.get()
+        config["speed_input_rate"] = self.speed_input_rate.get()
+        config["timeline_mode"] = self.timeline_mode.get()
+        config["toggle_wait_optogenetics"] = self.toggle_wait_optogenetics.get()
+        config["toggle_sound_optogenetics"] = self.toggle_sound_optogenetics.get()
+        config["toggle_sound_shock_optogenetics"] = self.toggle_sound_shock_optogenetics.get()
+
+        config["block_type"] = self.block_type.get()
+        config["block_duration"] = self.block_duration.get()
+        config["sound_duration"] = self.sound_duration.get()
+        config["shock_lead"] = self.shock_lead.get()
+
+        config["opto_frequency"] = self.opto_frequency.get()
+        config["opto_pulse_width"] = self.opto_pulse_width.get()
+        config["opto_duration"] = self.opto_duration.get()
+
+        config["stimulation_settings"] = self.stimulation_settings
+
+        cameras_info = []
+        for cam in self.cameras:
+            info = {
+                "type": cam.__class__.__name__,
+                "device_index": cam.device_index,
+                "width": cam.width,
+                "height": cam.height,
+                "exposure_time": getattr(cam, "exposure_time", None),
+                "sample_rate": getattr(cam, "sample_rate", None),
+                "record_rate": getattr(cam, "record_rate", cam.fps if hasattr(cam, "fps") else None)
+            }
+            cameras_info.append(info)
+        config["cameras"] = cameras_info
+
+        timeline_list = []
+        for entry in self.timeline:
+            entry_list = list(entry)
+            if len(entry_list) >= 3 and isinstance(entry_list[-1], list):
+                pass
+            timeline_list.append(entry_list)
+        config["timeline"] = timeline_list
+
+        if self.speed_encoder_gui:
+            se = self.speed_encoder_gui
+            ch_config = []
+            for i in range(se.num_channels):
+                ch_config.append({
+                    "enabled": se. enabled_channels[i].get(),
+                    "view_mode": se.view_mode[i].get(),
+                    "auto_scale": se.auto_scale[i].get(),
+                    "x_range": se.x_range[i].get(),
+                    "y_range": se.y_range[i].get(),
+                    "voltage_range": se.voltage_range[i].tolist()
+                })
+            config["speed_channels"] = ch_config
+
+        with open(filename, "w") as f:
+            json.dump(config, f, indent=0)
+        print(f"Config saved as: {filename}")
+
+    def load_configuration(self):
+        filename = filedialog.askopenfilename(
+            filetypes=[("JSON files", "*.json")],
+            initialdir=self.save_dir
+        )
+        if not filename:
+            return
+
+        with open(filename, "r") as f:
+            config = json.load(f)
+
+        self.stop_preview_all()
+        if any(cam.recording for cam in self.cameras):
+            self.stop_experiment()
+
+        self.clear_all_cameras()
+        self.timeline.clear()
+        self.timeline_listbox.delete(0, tk.END)
+
+        self.user_filename_prefix.set(config.get("user_filename_prefix", "experiment"))
+        self.save_dir = config.get("save_dir", os.getcwd())
+        self.enable_speed_sensor.set(config.get("enable_speed_sensor", False))
+        self.speed_input_rate.set(config.get("speed_input_rate", 1000))
+        self.timeline_mode.set(config.get("timeline_mode", True))
+        self.toggle_wait_optogenetics.set(config.get("toggle_wait_optogenetics", False))
+        self.toggle_sound_optogenetics.set(config.get("toggle_sound_optogenetics", False))
+        self.toggle_sound_shock_optogenetics.set(config.get("toggle_sound_shock_optogenetics", False))
+
+        self.update_block_types()
+
+        self.block_type.set(config.get("block_type", "Wait"))
+        self.block_duration.set(config.get("block_duration", "5"))
+        self.sound_duration.set(config.get("sound_duration", "5"))
+        self.shock_lead.set(config.get("shock_lead", "2"))
+
+        self.opto_frequency.set(config.get("opto_frequency", 20.0))
+        self.opto_pulse_width.set(config.get("opto_pulse_width", 10.0))
+        self.opto_duration.set(config.get("opto_duration", 1000.0))
+        self.opto_delay.set(config.get("opto_delay", 0.0))
+
+        self.stimulation_settings = config.get("stimulation_settings", [])
+        self.update_stimulation_list()
+
+        cameras_info = config.get("cameras", [])
+        for cam_info in cameras_info:
+            try:
+                self._add_cameras_from_info(cam_info)
+            except Exception as e:
+                print(f"Loading cameras failed: {e}, please check the connection of devices")
+
+        for entry_list in config.get("timeline", []):
+            entry = tuple(entry_list)
+            self.timeline.append(entry)
+            display_str = self._format_timeline_entry(entry)
+            self.timeline_listbox.insert(tk.END, display_str)
+
+        if self.speed_encoder_gui and "speed_channels" in config:
+            se = self.speed_encoder_gui
+            for i, ch_cfg in enumerate(config["speed_channels"]):
+                if i >= se.num_channels:
+                    break
+                se.enabled_channels[i].set(ch_cfg.get("enabled", True))
+                se.view_mode[i].set(ch_cfg.get("view_mode", False))
+                se.auto_scale[i].set(ch_cfg.get("auto_scale", True))
+                se.x_range[i].set(ch_cfg.get("x_range", ""))
+                se.y_range[i].set(ch_cfg.get("y_range", ""))
+                if "voltage_range" in ch_cfg:
+                    se.voltage_range[i] = np.array(ch_cfg["voltage_range"])
+
+        print(f"Config loaded: {filename}")
+    
+    def _add_cameras_from_info(self, info):
+        cam_type = info["type"]
+        device_index = info["device_index"]
+        width = info["width"]
+        height = info["height"]
+        record_rate = info["record_rate"]
+        if cam_type == "FLIRCamera":
+            cam = FLIRCamera(self.root, self.arduino, camera_id=len(self.cameras), device_index=device_index)
+            cam.set_parameters(width, height, info.get("exposure_time", 1000.0),
+                               info.get("sample_rate", 90.0), record_rate)
+        elif cam_type == "HKCamera":
+            cam = HKCamera(self.root, self.arduino, camera_id=len(self.cameras), device_index=device_index)
+            cam.set_parameters(width, height, info.get("exposure_time", 1000.0),
+                               info.get("sample_rate", 90.0), record_rate)
+        elif cam_type == "OpenCVCamera":
+            cam = OpenCVCamera(self.root, self.arduino, camera_id=len(self.cameras), device_index=device_index, num_channels=1)
+            cam.set_parameters(width, height, record_rate)
+        else:
+            raise  ValueError(f"Unkown camera type: {cam_type}")
+        
+        cam.open()
+        self.cameras.append(cam)
+        self.create_camera_view(cam.camera_id)
+        self.update_camera_list()
+
+    def _format_timeline_entry(self, entry):
+        btype = entry[0]
+        if btype in ["Wait", "Sound"]:
+            return f"{btype} - {entry[1]:.1f}s"
+        elif btype in ["Wait+Optogenetics", "Sound+Optogenetics"]:
+            dur = entry[1]
+            stim_count = len(entry[2]) if len(entry) > 2 else 0
+            return f"{btype} - {dur:.1f}s, Stimulations: {stim_count}"
+        elif btype == "Sound+Shock":
+            sound_dur, shock_lead = entry[1], entry[2]
+            return f"{btype} - Sound {sound_dur:.1f}s, Shock start {shock_lead:.1f}s before end"
+        elif btype == "Sound+Shock+Optogenetics":
+            sound_dur, shock_lead, stim_settings = entry[1], entry[2], entry[3]
+            return f"{btype} - Sound {sound_dur:.1f}s, Shock start {shock_lead:.1f}s before end, Stimulations: {len(stim_settings)}"
+        return str(entry)
+    
     def setup_ui(self):
         main_frame = ttk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -1876,6 +2060,12 @@ class ExperimentGUI:
         ttk.Label(self.file_frame, text="Filename Prefix:").grid(row=0, column=0, sticky="w", pady=2)
         ttk.Entry(self.file_frame, textvariable=self.user_filename_prefix, width=17).grid(row=0, column=1, sticky="ew", pady=2)
         ttk.Button(self.file_frame, text="Choose Save Directory", command=self.choose_directory, width=30).grid(row=1, column=0, columnspan=2, pady=5)
+        
+        # Added config file IO
+        btn_config = ttk.Frame(self.file_frame)
+        btn_config.grid(row=2, column=0, columnspan=2, pady=5)
+        ttk.Button(self.file_frame, text="Save Config", command=self.save_configuration, width=14).grid(row=2, column=0, padx=5, pady=5)
+        ttk.Button(self.file_frame, text="Load Config", command=self.load_configuration, width=14).grid(row=2, column=1, padx=5, pady=5)
 
         self.device_frame = ttk.LabelFrame(left_panel, text="Device Control")
         self.device_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -3072,7 +3262,7 @@ class ExperimentGUI:
     def trigger_stimulation(self, duration):
         try:
             task = Task()
-            task.CreateAOVoltageChan(f"{self.daq_device}/ao0", "", -10.0, 10.0, 10348, None)
+            task.CreateAOVoltageChan(f"{self.daq_device}/ao1", "", -10.0, 10.0, 10348, None)
             sampling_rate = 5000
             total_samples = int(sampling_rate * duration)
             if total_samples <= 0:
@@ -3087,7 +3277,7 @@ class ExperimentGUI:
             task.ClearTask()
 
             reset_task = Task()
-            reset_task.CreateAOVoltageChan(f"{self.daq_device}/ao0", "", -10.0, 10.0, 10348, None)
+            reset_task.CreateAOVoltageChan(f"{self.daq_device}/ao1", "", -10.0, 10.0, 10348, None)
             reset_task.StartTask()
             reset_task.WriteAnalogScalarF64(True, 0.001, 0.0, None)
             reset_task.StopTask()
